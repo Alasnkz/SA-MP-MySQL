@@ -95,6 +95,12 @@ enum E_MYSQL_EXECTIME_UNIT
 	MICROSECONDS
 };
 
+enum E_MYSQL_FILE_EXEC_TYPE
+{
+	THREADED = 1, // tquery
+	PARALLEL // pquery
+}
+
 #define MYSQL_DEFAULT_HANDLE MySQL:1
 #define MYSQL_INVALID_HANDLE MySQL:0
 #define MYSQL_INVALID_CACHE Cache:0
@@ -232,6 +238,9 @@ native cache_warning_count();
 native cache_get_query_exec_time(E_MYSQL_EXECTIME_UNIT:unit = MICROSECONDS);
 native cache_get_query_string(destination[], max_len = sizeof(destination));
 
+native QueryFile:mysql_load_file(const filepath[]);
+native mysql_link_file(QueryFile:query_file, const callback[] = "", const format[] = "", {Float, _}:...);
+native mysql_execute_file(MySQL:handle, QueryFile:query_file, E_MYSQL_FILE_EXEC_TYPE:type, const format[] = "", {Float, _}:...);
 
 // Forward declarations
 forward OnQueryError(errorid, const error[], const callback[], const query[], MySQL:handle);

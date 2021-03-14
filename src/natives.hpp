@@ -60,7 +60,6 @@ namespace Native
 	AMX_DECLARE_NATIVE(mysql_get_charset);
 	AMX_DECLARE_NATIVE(mysql_stat);
 
-
 	//Cache natives
 	AMX_DECLARE_NATIVE(cache_get_row_count);
 	AMX_DECLARE_NATIVE(cache_get_field_count);
@@ -92,4 +91,8 @@ namespace Native
 
 	AMX_DECLARE_NATIVE(cache_get_query_exec_time);
 	AMX_DECLARE_NATIVE(cache_get_query_string);
+
+	AMX_DECLARE_NATIVE(mysql_load_file);
+	AMX_DECLARE_NATIVE(mysql_link_file);
+	AMX_DECLARE_NATIVE(mysql_execute_file);
 };

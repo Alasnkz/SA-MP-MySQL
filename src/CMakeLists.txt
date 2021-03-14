@@ -50,6 +50,8 @@ add_samp_plugin(mysql
 	CQuery.hpp
 	CResult.cpp
 	CResult.hpp
+	CQueryFile.cpp
+	CQueryFile.hpp
 	natives.cpp
 	natives.hpp
 	CSingleton.hpp

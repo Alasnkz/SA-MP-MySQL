@@ -15,7 +15,7 @@ class CResultSet;
 class CResult;
 class COptions;
 class COrm;
-
+class CQueryFile;
 
 using Handle_t = CHandle *;
 using HandleId_t = unsigned int;
@@ -34,3 +34,6 @@ using DispatchFunction_t = std::function < void() >;
 
 using Orm_t = shared_ptr<COrm>;
 using OrmId_t = unsigned int;
+
+using QueryFile_t = CQueryFile *;
+using QueryFileId_t = unsigned int;

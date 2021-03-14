@@ -44,10 +44,11 @@ public: //type definitions
 	static const string ModuleName;
 
 public: //constructor / destructor
-	CCallback(AMX *amx, int cb_idx, ParamList_t &&params) :
+	CCallback(AMX *amx, int cb_idx, ParamList_t &&params, std::string name) :
 		m_AmxInstance(amx),
 		m_AmxCallbackIndex(cb_idx),
-		m_Params(params)
+		m_Params(params),
+		m_Name(name)
 	{ }
 	~CCallback() = default;
 
@@ -56,14 +57,22 @@ private: //variables
 	int m_AmxCallbackIndex = -1;
 
 	ParamList_t m_Params;
+	std::string m_Name;
 
 public: //functions
 	bool Execute();
-
+	const std::string GetName()
+	{
+		return m_Name;
+	}
 public: //factory functions
 	static Callback_t Create(AMX *amx, const char *name, const char *format,
 							 cell *params, cell param_offset,
 							 CError<CCallback> &error);
+
+	static CCallback* CreateRaw(AMX* amx, const char* name, const char* format,
+		cell* params, cell param_offset,
+		CError<CCallback>& error);
 
 	static Callback_t Create(CError<CCallback> &error,
 							 AMX *amx, const char *name, const char *format, ...);

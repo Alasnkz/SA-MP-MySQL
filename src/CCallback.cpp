@@ -158,7 +158,7 @@ Callback_t CCallback::Create(AMX *amx, const char *name, const char *format,
 	CLog::Get()->Log(LogLevel::DEBUG,
 					 "created delayed callback with {} parameter{}",
 					 param_list.size(), param_list.size() > 1 ? "s" : "");
-	return std::make_shared<CCallback>(amx, cb_idx, std::move(param_list));
+	return std::make_shared<CCallback>(amx, cb_idx, std::move(param_list), name);
 }
 
 Callback_t CCallback::Create(CError<CCallback> &error, AMX *amx,
@@ -257,9 +257,161 @@ Callback_t CCallback::Create(CError<CCallback> &error, AMX *amx,
 					 "created delayed callback with {} parameter{}",
 					 param_list.size(), param_list.size() > 1 ? "s" : "");
 
-	return std::make_shared<CCallback>(amx, cb_idx, std::move(param_list));
+	return std::make_shared<CCallback>(amx, cb_idx, std::move(param_list), name);
 }
 
+CCallback* CCallback::CreateRaw(AMX* amx, const char* name, const char* format,
+	cell* params, cell param_offset,
+	CError<CCallback>& error)
+{
+	CLog::Get()->Log(LogLevel::DEBUG,
+		"CCallback::Create(amx={}, name='{}', format='{}', params={}, param_offset={})",
+		static_cast<const void*>(amx),
+		name ? name : "(nullptr)",
+		format ? format : "(nullptr)",
+		static_cast<const void*>(params), param_offset);
+
+	if (amx == nullptr)
+	{
+		error.set(Error::INVALID_AMX, "invalid AMX");
+		return nullptr;
+	}
+
+	if (params == nullptr)
+	{
+		error.set(Error::INVALID_PARAMETERS, "invalid parameters");
+		return nullptr;
+	}
+
+	if (name == nullptr || strlen(name) == 0)
+	{
+		error.set(Error::EMPTY_NAME, "empty name specified");
+		return nullptr;
+	}
+
+	int cb_idx = -1;
+	if (amx_FindPublic(amx, name, &cb_idx) != AMX_ERR_NONE || cb_idx < 0)
+	{
+		error.set(Error::NOT_FOUND, "callback \"{}\" does not exist", name);
+		return nullptr;
+	}
+
+	CLog::Get()->Log(LogLevel::DEBUG,
+		"CCallback::Create - callback index for '{}': {}",
+		name, cb_idx);
+
+
+	const size_t num_params = (format == nullptr) ? 0 : strlen(format);
+	if ((params[0] / sizeof(cell) - (param_offset - 1)) != num_params)
+	{
+		error.set(Error::INVALID_PARAM_COUNT,
+			"parameter count does not match format specifier length");
+		return nullptr;
+	}
+
+	ParamList_t param_list;
+	if (num_params != 0)
+	{
+		cell param_idx = 0;
+		cell* address_ptr = nullptr;
+		cell* array_addr_ptr = nullptr;
+
+		do
+		{
+			if (array_addr_ptr != nullptr && (*format) != 'd' && (*format) != 'i')
+			{
+				error.set(Error::EXPECTED_ARRAY_SIZE,
+					"expected 'd'/'i' specifier for array size (got '{}' instead)",
+					*format);
+				return nullptr;
+			}
+
+			CLog::Get()->Log(LogLevel::DEBUG,
+				"processing specifier '{}' with parameter index {}",
+				*format, param_idx);
+
+			switch (*format)
+			{
+			case 'd': //decimal
+			case 'i': //integer
+			{
+				amx_GetAddr(amx, params[param_offset + param_idx], &address_ptr);
+				cell value = *address_ptr;
+				if (array_addr_ptr != nullptr)
+				{
+					CLog::Get()->Log(LogLevel::DEBUG, "expecting array size");
+					if (value <= 0)
+					{
+						error.set(Error::INVALID_ARRAY_SIZE,
+							"invalid array size '{}'", value);
+						return nullptr;
+					}
+					cell* copied_array =
+						static_cast<cell*>(malloc(value * sizeof(cell)));
+					memcpy(copied_array, array_addr_ptr, value * sizeof(cell));
+
+					param_list.push_front(
+						std::make_tuple(
+							'a', std::make_tuple(
+								copied_array, value)));
+					CLog::Get()->Log(LogLevel::DEBUG, "pushed array");
+					array_addr_ptr = nullptr;
+				}
+
+				param_list.push_front(std::make_tuple('c', value));
+				CLog::Get()->Log(LogLevel::DEBUG,
+					"retrieved and pushed value '{}'", value);
+			}
+			break;
+			case 'f': //float
+			case 'b': //bool
+				amx_GetAddr(amx, params[param_offset + param_idx], &address_ptr);
+				param_list.push_front(std::make_tuple('c', *address_ptr));
+				CLog::Get()->Log(LogLevel::DEBUG,
+					"retrieved and pushed value '{}'", *address_ptr);
+				break;
+			case 's': //string
+			{
+				const char* str = nullptr;
+				amx_StrParam(amx, params[param_offset + param_idx], str);
+				param_list.push_front(std::make_tuple('s', string(str ? str : "")));
+				CLog::Get()->Log(LogLevel::DEBUG, "retrieved and pushed value '{}'", str ? str : "");
+			}
+			break;
+			case 'a': //array
+				amx_GetAddr(amx, params[param_offset + param_idx], &array_addr_ptr);
+				CLog::Get()->Log(LogLevel::DEBUG, "retrieved array '{}'",
+					static_cast<const void*>(array_addr_ptr));
+				break;
+			case 'r': //reference
+				amx_GetAddr(amx, params[param_offset + param_idx], &address_ptr);
+				param_list.push_front(std::make_tuple('r', address_ptr));
+				CLog::Get()->Log(LogLevel::DEBUG, "retrieved and pushed reference '{}'",
+					static_cast<const void*>(array_addr_ptr));
+				break;
+			default:
+				error.set(Error::INVALID_FORMAT_SPECIFIER,
+					"invalid format specifier '{}'", *format);
+				return nullptr;
+			}
+			param_idx++;
+		} while (*(++format) != '\0');
+
+		if (array_addr_ptr != nullptr)
+		{
+			error.set(Error::NO_ARRAY_SIZE,
+				"no array size specified after 'a' specifier");
+			return nullptr;
+		}
+	}
+
+	CLog::Get()->Log(LogLevel::INFO,
+		"Callback '{}' set up for delayed execution.", name);
+	CLog::Get()->Log(LogLevel::DEBUG,
+		"created delayed callback with {} parameter{}",
+		param_list.size(), param_list.size() > 1 ? "s" : "");
+	return new CCallback(amx, cb_idx, std::move(param_list), name);
+}
 
 bool CCallback::Execute()
 {
@@ -364,6 +516,5 @@ bool CCallback::Execute()
 		amx_Release(m_AmxInstance, amx_address);
 
 	CLog::Get()->Log(LogLevel::INFO, "Callback successfully executed.");
-
 	return true;
 }

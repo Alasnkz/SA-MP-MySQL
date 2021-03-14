@@ -110,7 +110,6 @@ extern "C" const AMX_NATIVE_INFO native_list[] =
 	AMX_DEFINE_NATIVE(mysql_set_charset)
 	AMX_DEFINE_NATIVE(mysql_stat)
 
-
 	AMX_DEFINE_NATIVE(cache_get_row_count)
 	AMX_DEFINE_NATIVE(cache_get_field_count)
 	AMX_DEFINE_NATIVE(cache_get_result_count)
@@ -141,6 +140,11 @@ extern "C" const AMX_NATIVE_INFO native_list[] =
 
 	AMX_DEFINE_NATIVE(cache_get_query_exec_time)
 	AMX_DEFINE_NATIVE(cache_get_query_string)
+
+	AMX_DEFINE_NATIVE(mysql_load_file)
+	AMX_DEFINE_NATIVE(mysql_link_file)
+	AMX_DEFINE_NATIVE(mysql_execute_file)
+
 	{ NULL, NULL }
 };
 

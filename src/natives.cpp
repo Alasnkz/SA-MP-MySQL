@@ -6,6 +6,7 @@
 #include "COptions.hpp"
 #include "COrm.hpp"
 #include "CLog.hpp"
+#include "CQueryFile.hpp"
 #include "misc.hpp"
 
 #include <fstream>
@@ -1184,8 +1185,8 @@ AMX_DECLARE_NATIVE(Native::mysql_format)
 				break;
 				default:
 					CLog::Get()->LogNative(LogLevel::ERROR,
-										   "invalid format specifier '%{}'",
-										   *format_str);
+						"invalid format specifier '%{}'",
+						*format_str);
 					// can't break out of loop from within a switch
 					break_loop = true;
 			}
@@ -2053,4 +2054,143 @@ AMX_DECLARE_NATIVE(Native::cache_get_query_string)
 
 	CLog::Get()->LogNative(LogLevel::DEBUG, "return value: '1'");
 	return 1;
+}
+
+// native QueryFile:mysql_load_file(const filepath[]);
+AMX_DECLARE_NATIVE(Native::mysql_load_file)
+{
+	CScopedDebugInfo dbg_info(amx, "mysql_load_file", params, "s");
+	std::string filepath = amx_GetCppString(amx, params[1]);
+	if (!filepath.length())
+	{
+		CLog::Get()->LogNative(LogLevel::ERROR, "invalid path handled");
+		return 0;
+	}
+
+	auto ret = CQueryFileManager::Get()->Create(filepath);
+	CLog::Get()->LogNative(LogLevel::DEBUG, "return value: '{}'", ret);
+	return ret;
+}
+
+// native mysql_link_file(QueryFile:query_file, const callback[] = "", const format[] = "", {Float, _}:...);
+AMX_DECLARE_NATIVE(Native::mysql_link_file)
+{
+	const QueryFileId_t query_file_id = static_cast<QueryFileId_t>(params[1]);
+	QueryFile_t query_file = CQueryFileManager::Get()->GetHandle(query_file_id);
+	if (query_file == nullptr)
+	{
+		CLog::Get()->LogNative(LogLevel::ERROR, "invalid query file id '{}'", query_file_id);
+		return 0;
+	}
+
+	string
+		callback_str = amx_GetCppString(amx, params[2]),
+		format_str = amx_GetCppString(amx, params[3]);
+
+	CError<CCallback> callback_error;
+	CCallback* callback = CCallback::CreateRaw(
+		amx,
+		callback_str.c_str(),
+		format_str.c_str(),
+		params, 4,
+		callback_error);
+
+	if (callback_error && callback_error.type() != CCallback::Error::EMPTY_NAME)
+	{
+		CLog::Get()->LogNative(LogLevel::ERROR, callback_error.msg().c_str());
+		return false;
+	}
+
+	query_file->SetCallback(callback);
+	return 1;
+}
+
+// native mysql_execute_file(MySQL:handle, QueryFile:query_file, E_MYSQL_FILE_EXEC_TYPE:type, const format[] = "", {Float, _}:...);
+AMX_DECLARE_NATIVE(Native::mysql_execute_file)
+{
+	CScopedDebugInfo dbg_info(amx, "mysql_parse_file", params, "ddds");
+	const HandleId_t handle_id = static_cast<HandleId_t>(params[1]);
+	Handle_t handle = CHandleManager::Get()->GetHandle(handle_id);
+
+	if (handle == nullptr)
+	{
+		CLog::Get()->LogNative(LogLevel::ERROR,
+			"invalid connection handle '{}'", handle_id);
+		return 0;
+	}
+
+	const QueryFileId_t query_file_id = static_cast<QueryFileId_t>(params[2]);
+	QueryFile_t query_file = CQueryFileManager::Get()->GetHandle(query_file_id);
+
+	if (query_file == nullptr)
+	{
+		CLog::Get()->LogNative(LogLevel::ERROR, "invalid query file id '{}'", query_file_id);
+		return 0;
+	}
+
+	std::string query_str = query_file->RenderString(handle, amx_GetCppString(amx, params[4]), amx, params, 5);
+
+	CCallback* callback = query_file->GetCallback();
+	std::string callback_name = "";
+	Query_t query = CQuery::Create(query_str);
+	cell ret_val = 0;
+
+	if (callback != nullptr)
+	{
+		callback_name = callback->GetName();
+		query->OnExecutionFinished([callback](ResultSet_t resultset)
+			{
+				CResultSetManager::Get()->SetActiveResultSet(resultset);
+
+				callback->Execute();
+				delete callback;
+
+				//unset active result(cache) + delete result (done by shared_ptr)
+				CResultSetManager::Get()->SetActiveResultSet(nullptr);
+			});
+	}
+
+	query->OnError(
+		[amx, handle_id, callback_name, query_str](unsigned int errorid,
+			string error)
+		{
+			CError<CCallback> error_cb_error;
+			//forward OnQueryError(errorid, const error[], const callback[], const query[], MySQL:handle);
+			
+			Callback_t error_cb = CCallback::Create(error_cb_error, amx,
+				"OnQueryError", "dsssd",
+				errorid, error.c_str(),
+				callback_name.c_str(),
+				query_str.c_str(), handle_id);
+
+			if (!error_cb_error)
+				error_cb->Execute();
+		}
+	);
+
+	CHandle::ExecutionType type;
+	int pawn_type = static_cast<int>(params[3]);
+	switch (pawn_type)
+	{
+		case CHandle::ExecutionType::THREADED:
+		{
+			type = CHandle::ExecutionType::THREADED;
+			break;
+		}
+
+		case CHandle::ExecutionType::PARALLEL:
+		{
+			type = CHandle::ExecutionType::PARALLEL;
+			break;
+		}
+
+		default:
+		{
+			type = CHandle::ExecutionType::THREADED;
+			CLog::Get()->LogNative(LogLevel::WARNING, "invalid execution type specified, defaulting to THREADED");
+			break;
+		}
+	}
+
+	return handle->Execute(type, query);
 }
