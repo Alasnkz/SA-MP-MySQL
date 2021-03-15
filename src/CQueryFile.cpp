@@ -43,6 +43,7 @@ CQueryFile::~CQueryFile()
 	}
 }
 
+#include <iostream>
 std::string const CQueryFile::RenderString(Handle_t handle, std::string const & specifiers, AMX* amx, cell* params, int param_start)
 {
 	std::string value = m_Query; // Copy the query.
@@ -68,6 +69,7 @@ std::string const CQueryFile::RenderString(Handle_t handle, std::string const & 
 		amx_GetAddr(amx, params[param_start + current_param_count],
 			&amx_address);
 
+		value.replace(replacement_loc->second + last_loc, 1, ""); // remove space
 		switch (character)
 		{
 			case 'e':
@@ -76,9 +78,8 @@ std::string const CQueryFile::RenderString(Handle_t handle, std::string const & 
 				string escaped_str;
 				if (handle->EscapeString(str.c_str(), escaped_str))
 				{
-					std::string string_value = "'" + escaped_str + "'";
-					value.insert(replacement_loc->second + last_loc, string_value);
-					last_loc += string_value.length();
+					value.insert(replacement_loc->second + last_loc, escaped_str);
+					last_loc += escaped_str.length();
 				}
 				else
 				{
@@ -141,6 +142,7 @@ std::string const CQueryFile::RenderString(Handle_t handle, std::string const & 
 		current_location++;
 		current_param_count++;
 	}
+	std::cout << value << std::endl;
 	return value;
 }
 
