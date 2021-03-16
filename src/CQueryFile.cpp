@@ -43,7 +43,6 @@ CQueryFile::~CQueryFile()
 	}
 }
 
-#include <iostream>
 std::string const CQueryFile::RenderString(Handle_t handle, std::string const & specifiers, AMX* amx, cell* params, int param_start)
 {
 	std::string value = m_Query; // Copy the query.
@@ -142,7 +141,6 @@ std::string const CQueryFile::RenderString(Handle_t handle, std::string const & 
 		current_location++;
 		current_param_count++;
 	}
-	std::cout << value << std::endl;
 	return value;
 }
 
