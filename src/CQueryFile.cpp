@@ -27,7 +27,7 @@ CQueryFile::CQueryFile(QueryFileId_t id, std::string const filepath) :
 		size_t end_quote = m_Query.substr(begin_quote + 1).find("\"");
 		if (begin_quote == std::string::npos && end_quote == std::string::npos)
 		{
-			m_Query[loc] = ' ';
+			m_Query.replace(loc, 1, ""); // remove space
 			m_ReplacementLocations.emplace(nonce, loc);
 			nonce++;
 		}
@@ -68,7 +68,6 @@ std::string const CQueryFile::RenderString(Handle_t handle, std::string const & 
 		amx_GetAddr(amx, params[param_start + current_param_count],
 			&amx_address);
 
-		value.replace(replacement_loc->second + last_loc, 1, ""); // remove space
 		switch (character)
 		{
 			case 'e':
