@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(mysql)
 
-set(MYSQL_PLUGIN_VERSION "R41-4")
+set(MYSQL_PLUGIN_VERSION "R42")
 
 option (BUILD_TESTS "Build tests" OFF)
 
@@ -15,22 +15,34 @@ if(UNIX)
 	set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS OFF)
 endif()
 
+include(libs/conan-cmake/conan.cmake)
+function(add_conan_lib pkg_name conan_pkg)
+	conan_check(REQUIRED)
 
-find_package(MySQLCAPI REQUIRED)
+	conan_cmake_run(
+		REQUIRES ${conan_pkg}
+		ARCH x86
+		BASIC_SETUP CMAKE_TARGETS
+		BUILD missing
+	)
 
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.57 QUIET)
-if(NOT Boost_FOUND)
-	set(BOOST_ROOT "${BOOST_ROOT}" CACHE PATH "Set the Boost root folder.")
-	mark_as_advanced(CLEAR BOOST_ROOT)
-	message(FATAL_ERROR "Could NOT find Boost; specify additional path.")
-endif()
-mark_as_advanced(BOOST_ROOT Boost_DIR)
+	set_target_properties(${pkg_name} PROPERTIES IMPORTED_GLOBAL TRUE)
+endfunction()
 
-add_subdirectory(libs/fmt)
-mark_as_advanced(FMT_DOC FMT_INSTALL FMT_PEDANTIC FMT_TEST FMT_USE_CPP11)
+add_conan_lib(CONAN_PKG::mariadb-connector-c mariadb-connector-c/3.1.11)
 
-find_package(log-core REQUIRED CONFIG)
+conan_check(REQUIRED)
+conan_cmake_run(
+	REQUIRES boost/1.73.0
+	ARCH x86
+	BASIC_SETUP CMAKE_TARGETS
+	BUILD missing
+	OPTIONS boost:zlib=False
+)
+set_target_properties(CONAN_PKG::boost PROPERTIES IMPORTED_GLOBAL TRUE)
 
+set(CONAN_HAS_FMT TRUE CACHE INTERNAL FALSE)
+add_conan_lib(CONAN_PKG::fmt fmt/7.1.3)
 
+add_subdirectory(libs/log-core)
 add_subdirectory(src)

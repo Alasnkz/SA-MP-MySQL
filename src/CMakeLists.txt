@@ -92,13 +92,13 @@ target_compile_features(mysql PUBLIC
 	cxx_variadic_templates
 )
 
-add_dependencies(mysql log-core fmt)
+add_dependencies(mysql log-core)
 
 if(MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -D_ENABLE_ATOMIC_ALIGNMENT_FIX)
 endif()
 
-target_link_libraries(mysql log-core fmt)
+target_link_libraries(mysql log-core CONAN_PKG::fmt CONAN_PKG::boost CONAN_PKG::mariadb-connector-c)
 
 if(UNIX)
 	if(NOT APPLE)
@@ -108,27 +108,3 @@ if(UNIX)
 	set_target_properties(mysql PROPERTIES
 		INSTALL_RPATH "$ORIGIN/..:$ORIGIN/")
 endif()
-
-if(BUILD_STATIC)
-	target_link_libraries(mysql "${MYSQLCAPI_LIBRARY_STATIC}")
-else()
-	target_link_libraries(mysql "${MYSQLCAPI_LIBRARY}")
-endif()
-
-install(TARGETS mysql DESTINATION "plugins/")
-get_target_property(LOGCORE_LOCATION log-core LOCATION)
-install(FILES "${LOGCORE_LOCATION}" DESTINATION "./")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/a_mysql.inc" DESTINATION "pawno/include/")
-install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" DESTINATION "./")
-if(WIN32 AND MYSQLCAPI_LIBRARY_SHARED)
-	install(FILES "${MYSQLCAPI_LIBRARY_SHARED}" DESTINATION "./")
-endif()
-
-set(CPACK_PACKAGE_VERSION ${MYSQL_PLUGIN_VERSION})
-if(WIN32)
-	set(CPACK_GENERATOR ZIP)
-else()
-	set(CPACK_GENERATOR TGZ)
-endif()
-
-include(CPack)
