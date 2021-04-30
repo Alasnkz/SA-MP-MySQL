@@ -67,5 +67,9 @@ inline bool ConvertDataToStr(bool src, string &dest)
 	return karma::generate(std::back_inserter(dest), karma::bool_, src);
 }
 
+inline void AppendToBuffer(std::string & buffer, std::string& appending)
+{
+	buffer.append(appending);
+}
 
 #pragma warning (pop)
